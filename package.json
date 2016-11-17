@@ -1,0 +1,25 @@
+{
+  "name": "smtp-suite",
+  "version": "0.1.0",
+  "description": "SMTP client / server suite for node.js.",
+  "main": "src/smtp-suite.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/datenwelt/smtp-suite.git"
+  },
+  "keywords": [
+    "SMTP",
+    "mail",
+    "e-mail",
+    "node"
+  ],
+  "author": "Jan Obladen",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/datenwelt/smtp-suite/issues"
+  },
+  "homepage": "https://github.com/datenwelt/smtp-suite#readme"
+}
