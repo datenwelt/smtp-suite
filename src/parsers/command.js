@@ -1,3 +1,18 @@
+// Copyright 2016 Jan Obladen
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//  http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+//
+
 var _ = require('underscore');
 var Promise = require('bluebird');
 
@@ -70,8 +85,6 @@ SMTPCmdLineParser.prototype.parse = function (inputStream) {
 		}, this);
 		var cleanup = _.bind(function (result) {
 			inputStream.removeListener('data', onData);
-			inputStream.removeListener('error', onError);
-			inputStream.removeListener('end', onEnd);
 			if (result instanceof Error) {
 				reject(result);
 			} else {
@@ -80,10 +93,12 @@ SMTPCmdLineParser.prototype.parse = function (inputStream) {
 			_timer && clearTimeout(_timer);
 		}, this);
 		inputStream.on('data', onData);
-		inputStream.on('error', onError);
-		inputStream.on('end', onEnd);
+		inputStream.once('error', onError);
+		inputStream.once('end', onEnd);
 		
-		_timer = setTimeout(onTimeout, this.timeout);
+		if ( this.timeout && this.timeout > 0 ) {
+			_timer = setTimeout(onTimeout, this.timeout);
+		}
 		
 	}, this));
 };
@@ -99,6 +114,12 @@ SMTPCmdLineParser.prototype.parseCommandLine = function (line) {
 	line = line.trimRight();
 	if (line.length > this.maxLineLength - 2) {
 		throw new Error(strfmt('Command line exceeds size limit of %d octets.', this.maxLineLength));
+	}
+	if ( line.match(/^\s/) ) {
+		throw new Error('Command lines cannot start with whitespace.');
+	}
+	if ( line.match(/[\r\n]/) ) {
+		throw new Error('Command lines cannot contain line breaks.');
 	}
 	var parts = line.split(/\s+/);
 	verb = parts[0];
