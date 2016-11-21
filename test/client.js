@@ -145,8 +145,11 @@ describe('SMTP Client', function () {
 				})
 				.then(function (reply) {
 					try {
+						expect(reply).to.have.property('code');
+						expect(reply).to.have.property('message');
+						expect(reply).to.have.property('lines');
 						done();
-					} catch(error) {
+					} catch (error) {
 						done(error);
 					}
 				})
@@ -155,6 +158,90 @@ describe('SMTP Client', function () {
 				});
 		});
 		
+		it('rejects the promise if the connection is closed.', function (done) {
+			serverPort = Math.floor(Math.random() * 10000) + 20000;
+			server = new SMTPServer();
+			server.listen(serverPort);
+			var client = new SMTPClient();
+			client.connect('localhost', serverPort)
+				.then(function (client) {
+					client.close();
+					return client.command('EHLO ' + os.hostname());
+				})
+				.then(function () {
+					done(new Error('Test succeeded unexpectedly.'));
+				})
+				.catch(function (error) {
+					try {
+						expect(error).to.be.an.instanceOf(Error);
+						expect(error.message).to.equal('Client is not connected.');
+						done();
+					} catch (error) {
+						done(error);
+					}
+				});
+		});
+		
+		it('rejects the promise if the reply does not arrive in time.', function (done) {
+			serverPort = Math.floor(Math.random() * 10000) + 20000;
+			server = new SMTPServer({
+				authOptional: true,
+				onMailFrom: function (address, session, callback) {
+					setTimeout(callback, 1000);
+				}
+			});
+			server.listen(serverPort);
+			var client = new SMTPClient();
+			client.connect('localhost', serverPort)
+				.then(function (c) {
+					client = c;
+					return client.command('EHLO ' + os.hostname());
+				})
+				.then(function () {
+					return client.command('MAIL FROM:<>', {timeout: 500});
+				})
+				.then(function (reply) {
+					done(new Error('Test succeeded unexpectedly.'));
+				})
+				.catch(function (error) {
+					try {
+						expect(error).to.be.an.instanceOf(Error);
+						expect(error.message).to.equal('Timeout parsing reply after 0.5 seconds.');
+						done();
+					} catch (error) {
+						done(error);
+					}
+				});
+		});
+		
+		it('rejects the promise if the reply contains too many octets.', function (done) {
+			serverPort = Math.floor(Math.random() * 10000) + 20000;
+			server = new SMTPServer({
+				authOptional: true
+			});
+			server.listen(serverPort);
+			var client = new SMTPClient();
+			client.connect('localhost', serverPort)
+				.then(function (c) {
+					client = c;
+					return client.command('EHLO ' + os.hostname());
+				})
+				.then(function () {
+					return client.command('MAIL FROM:<>', {maxReplyLineLength: 4});
+				})
+				.then(function (reply) {
+					done(new Error('Test succeeded unexpectedly.'));
+				})
+				.catch(function (error) {
+					try {
+						expect(error).to.be.an.instanceOf(Error);
+						expect(error.message).to.equal('Number of input bytes exceeds line limit of 4 octets.');
+						done();
+					} catch (error) {
+						done(error);
+					}
+				});
+		});
 	});
 	
 });

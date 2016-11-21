@@ -116,7 +116,7 @@ SMTPClient.prototype.upgrade = function (tls) {
 
 SMTPClient.prototype.close = function () {
 	if (this.socket) {
-		this.socket.close();
+		this.socket.end();
 		delete this.socket;
 	}
 };

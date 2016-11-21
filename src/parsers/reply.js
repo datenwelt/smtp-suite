@@ -55,7 +55,7 @@ SMTPReplyParser.prototype.parse = function (inputStream) {
 					replyLines.push(replyLine);
 					if (replyLine.isLast) {
 						if (pos != chunk.length) {
-							throw new Error('Premature end of input while parsing reply.');
+							throw new Error('Illicit overhead data after end of reply has been indicated.');
 						}
 						try {
 							reply = this.parseReply(replyLines);
