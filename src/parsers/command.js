@@ -197,7 +197,7 @@ SMTPCmdLineParser.prototype.parseCommandLine = function (line) {
 	
 };
 
-SMTPCmdLineParser.serializeCommand = function (command) {
+SMTPCmdLineParser.prototype.serializeCommand = function (command) {
 	if (!command) {
 		return "NOOP\r\n";
 	}
@@ -241,5 +241,8 @@ SMTPCmdLineParser.serializeCommand = function (command) {
 			}
 		});
 	}
-	return commandLine.trim() + "\r\n";
+	commandLine = commandLine.trim() + "\r\n";
+	if ( commandLine.length > this.maxLineLength )
+		throw new Error(strfmt('Serialized SMTP command exceeds maximum line length of %d octets.', this.maxLineLength));
+	return commandLine;
 };
