@@ -3,6 +3,7 @@
 var _ = require('underscore');
 var events = require('events');
 var net = require('net');
+var strfmt = require('util').format;
 
 
 var SMTPReplyParser = require('./parsers/reply');
@@ -25,6 +26,8 @@ function SMTPClient(options) {
 	this.maxReplyLineLength = options.maxReplyLineLength;
 	this.maxCommandLineLength = options.maxCommandLineLength;
 	this.maxDataLineLength = options.maxDataLineLength;
+	this.sending = false;
+	this.needsDrain = false;
 }
 
 SMTPClient.prototype.connect = function (host, port, options) {
@@ -102,12 +105,57 @@ SMTPClient.prototype.command = function (command, options) {
 		}).catch(function (error) {
 			reject(error);
 		});
-		var _write = _.bind(function(command){
-			if ( !this.socket.write(command, 'utf8') ) {
-				this.socket.once('drain', _write);
+		this._write(Buffer.from(command, 'utf8'));
+	}, this));
+};
+
+SMTPClient.prototype._write = function (data, options) {
+	options = options || {};
+	var timeout = options.timeout;
+	return new Promise(_.bind(function (resolve, reject) {
+		if ( this.needsDrain || this.sending ) {
+			return reject(new Error(strfmt('Unable to send data to the server: Client is not in sending state: %j', { sending: this.sending, needsDrain: this.needsDrain})));
+		}
+		var _timer;
+		var _onTimeout = _.bind(function () {
+			reject(new Error(strfmt('Unable to send data to the server within timeout of %d seconds.', timeout / 1000)));
+		}, this);
+		if (!data instanceof Buffer) {
+			return reject(new Error('Invalid input data - must be a buffer not ' + typeof data));
+		}
+		var _doWrite = _.bind(function (data) {
+			this.needsDrain = !this.socket.write(data, 'utf8', _.bind(function (err) {
+				this.sending = false;
+				if ( _timer ) { process.clearTimeout(_timer); }
+				if (err) {
+					reject(err instanceof Error ? err : new Error(err));
+				} else {
+					resolve(data);
+				}
+			}, this));
+			if (this.needsDrain) {
+				this.socket.once('drain', _.bind(function() {
+					this.needsDrain = false;
+				}, this));
 			}
-		}, this, command);
-		process.nextTick(_write);
+		}, this, data);
+		if (timeout) {
+			_timer = process.setTimeout(_onTimeout);
+		}
+		process.nextTick(_doWrite);
+	}, this));
+};
+
+SMTPClient.prototype.sendLine = function (line) {
+	return new Promise(_.bind(function (resolve, reject) {
+		if (line instanceof Buffer) {
+			line = line.toString('utf8');
+		}
+		line = line.trim();
+		if (line.indexOf("\n") != -1 || line.indexOf("\r")) {
+			return reject(new Error("Command lines cannot contain line breaks."));
+		}
+		
 	}, this));
 };
 
@@ -136,7 +184,8 @@ SMTPClient.prototype.close = function () {
 	}
 };
 
-SMTPClient.prototype.onError = function(error) {
+SMTPClient.prototype.onError = function (error) {
+	this.sending = false;
 	this.emit('error');
 };
 
@@ -150,16 +199,16 @@ SMTPClient.prototype.onClose = function (hadError) {
 	this._cleanup();
 };
 
-SMTPClient.prototype.onTimeout = function() {
+SMTPClient.prototype.onTimeout = function () {
 	this.emit('error', new Error('Timeout waiting on network data.'));
 	this._cleanup();
 };
 
-SMTPClient.prototype._cleanup = function() {
-	if ( this._onErrorListener) this.removeListener('end', this._onErrorListener);
-	if ( this._onEndListener) this.removeListener('end', this._onEndListener);
-	if ( this._onCloseListener) this.removeListener('close', this._onCloseListener);
-	if ( this._onTimeoutListener) this.removeListener('timeout', this._onTimeoutListener);
+SMTPClient.prototype._cleanup = function () {
+	if (this._onErrorListener) this.removeListener('end', this._onErrorListener);
+	if (this._onEndListener) this.removeListener('end', this._onEndListener);
+	if (this._onCloseListener) this.removeListener('close', this._onCloseListener);
+	if (this._onTimeoutListener) this.removeListener('timeout', this._onTimeoutListener);
 	delete this._onErrorListener;
 	delete this._onEndListener;
 	delete this._onCloseListener;
