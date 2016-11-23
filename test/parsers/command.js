@@ -172,25 +172,30 @@ describe("SMTP Command Line Parser", function () {
 	
 	describe('Serializing', function () {
 		
+		var parser;
+		beforeEach(function() {
+			parser = new SMTPCommandLineParser();
+		});
+		
 		it('empty input results in NOOP.', function () {
-			var cmdLine = SMTPCommandLineParser.serializeCommand();
+			var cmdLine = parser.serializeCommand();
 			expect(cmdLine).to.be.equal("NOOP\r\n");
 		});
 		
 		it('empty verb throws an error.', function () {
 			expect(function () {
-				SMTPCommandLineParser.serializeCommand({});
+				parser.serializeCommand({});
 			}).to.throw(Error);
 		});
 		
 		it('verb only commands', function () {
-			expect(SMTPCommandLineParser.serializeCommand({verb: 'NOOP'})).to.be.equal("NOOP\r\n");
-			expect(SMTPCommandLineParser.serializeCommand({verb: 'QUIT'})).to.be.equal("QUIT\r\n");
-			expect(SMTPCommandLineParser.serializeCommand({verb: 'RSET'})).to.be.equal("RSET\r\n");
+			expect(parser.serializeCommand({verb: 'NOOP'})).to.be.equal("NOOP\r\n");
+			expect(parser.serializeCommand({verb: 'QUIT'})).to.be.equal("QUIT\r\n");
+			expect(parser.serializeCommand({verb: 'RSET'})).to.be.equal("RSET\r\n");
 		});
 		
 		it('EHLO command with domain.', function () {
-			expect(SMTPCommandLineParser.serializeCommand({
+			expect(parser.serializeCommand({
 				verb: 'EHLO',
 				domain: 'baleen.io'
 			})).to.be.equal("EHLO baleen.io\r\n");
@@ -198,23 +203,23 @@ describe("SMTP Command Line Parser", function () {
 		
 		it('EHLO command without domain throws an error.', function () {
 			expect(function () {
-				SMTPCommandLineParser.serializeCommand({verb: 'EHLO'});
+				parser.serializeCommand({verb: 'EHLO'});
 			}).to.throw(Error);
 		});
 		
 		it('MAIL command accepted without a return path.', function () {
-			expect(SMTPCommandLineParser.serializeCommand({verb: 'MAIL'})).to.be.equal("MAIL FROM:<>\r\n");
+			expect(parser.serializeCommand({verb: 'MAIL'})).to.be.equal("MAIL FROM:<>\r\n");
 		});
 		
 		it('MAIL command with return path.', function () {
-			expect(SMTPCommandLineParser.serializeCommand({
+			expect(parser.serializeCommand({
 				verb: 'MAIL',
 				returnPath: 'test@baleen.io'
 			})).to.be.equal("MAIL FROM:<test@baleen.io>\r\n");
 		});
 		
 		it('MAIL command with return path and params.', function () {
-			expect(SMTPCommandLineParser.serializeCommand({
+			expect(parser.serializeCommand({
 				verb: 'MAIL',
 				returnPath: 'test@baleen.io',
 				params: [
@@ -225,19 +230,19 @@ describe("SMTP Command Line Parser", function () {
 		
 		it('RCPT command throws an error without a forward path.', function () {
 			expect(function () {
-				SMTPCommandLineParser.serializeCommand({verb: 'RCPT'})
+				parser.serializeCommand({verb: 'RCPT'})
 			}).to.throw(Error);
 		});
 		
 		it('RCPT command with forward path.', function () {
-			expect(SMTPCommandLineParser.serializeCommand({
+			expect(parser.serializeCommand({
 				verb: 'RCPT',
 				forwardPath: 'test@baleen.io'
 			})).to.be.equal("RCPT TO:<test@baleen.io>\r\n");
 		});
 		
 		it('RCPT command with forward path and params.', function () {
-			expect(SMTPCommandLineParser.serializeCommand({
+			expect(parser.serializeCommand({
 				verb: 'RCPT',
 				forwardPath: 'test@baleen.io',
 				params: [{
@@ -247,7 +252,7 @@ describe("SMTP Command Line Parser", function () {
 		});
 		
 		it('Command preserves the order of input params.', function () {
-			expect(SMTPCommandLineParser.serializeCommand(
+			expect(parser.serializeCommand(
 				{
 					verb: 'RCPT',
 					forwardPath: 'test@baleen.io',

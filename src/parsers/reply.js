@@ -133,7 +133,7 @@ SMTPReplyParser.prototype.parseReply = function (input) {
 	if (!replyLines.length) {
 		throw new Error('No reply lines to parse in input.');
 	}
-	return _.reduce(replyLines, _.bind(function (memo, replyLine, idx, list) {
+	var reply = _.reduce(replyLines, _.bind(function (memo, replyLine, idx, list) {
 		memo.code = replyLine.code;
 		if (idx == 0) {
 			memo.message = replyLine.message;
@@ -148,6 +148,20 @@ SMTPReplyParser.prototype.parseReply = function (input) {
 		}
 		return memo;
 	}, this), {});
+	if (reply >= 200 && reply < 300) {
+		reply.success = true;
+		reply.intermeidate = false;
+	} else if (reply >= 300 && reply < 400) {
+		reply.success = true;
+		reply.intermeidate = true;
+	} else if (reply >= 400 && reply < 500) {
+		reply.success = false;
+		reply.transient = true;
+	} else if (reply >= 500 && reply < 600) {
+		reply.success = false;
+		reply.transient = false;
+	}
+	return reply;
 };
 
 SMTPReplyParser.prototype.serializeReply = function (reply) {
@@ -161,20 +175,20 @@ SMTPReplyParser.prototype.serializeReply = function (reply) {
 		if (!reply.message)
 			throw new Error('Input object needs to have an array as "lines" property with at least 1 line.');
 	}
-	if ( reply.message ) {
+	if (reply.message) {
 		reply.lines = reply.lines || [];
 		reply.lines[0] = reply.message;
 	}
-	var output = _.chain(reply.lines).reduce(_.bind(function(memo, line, idx) {
+	var output = _.chain(reply.lines).reduce(_.bind(function (memo, line, idx) {
 		var currentLine = "";
 		currentLine += reply.code;
-		currentLine += idx == reply.lines.length-1 ? " " : "-";
+		currentLine += idx == reply.lines.length - 1 ? " " : "-";
 		currentLine += line.trim();
 		currentLine += "\r\n";
-		if ( currentLine.length > this.maxLineLength ) {
+		if (currentLine.length > this.maxLineLength) {
 			throw new Error(strfmt('Number of input bytes exceeds line limit of %d octets.', this.maxLineLength));
 		}
-		return memo+currentLine;
+		return memo + currentLine;
 	}, this), "").value();
 	return output;
 };

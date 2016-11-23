@@ -27,6 +27,7 @@
     "underscore": "^1.8.3"
   },
   "devDependencies": {
+    "brake": "^1.0.1",
     "chai": "^3.5.0",
     "mocha": "^3.1.2",
     "smtp-server": "^1.16.1"

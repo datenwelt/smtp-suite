@@ -1,16 +1,20 @@
 'use strict';
 
 var _ = require('underscore');
+var events = require('events');
 var net = require('net');
+
 
 var SMTPReplyParser = require('./parsers/reply');
 var SMTPCommandParser = require('./parsers/command');
 
 module.exports = SMTPClient;
 
+SMTPClient.prototype = Object.create(events.EventEmitter.prototype);
 SMTPClient.prototype.constructor = SMTPClient;
 
 function SMTPClient(options) {
+	events.EventEmitter.call(this);
 	options = Object.assign({
 		timeout: 300000,
 		maxReplyLineLength: 512,
@@ -28,7 +32,6 @@ SMTPClient.prototype.connect = function (host, port, options) {
 	var timeout = options.timeout || this.timeout;
 	var maxReplyLineLength = options.maxReplyLineLength || this.maxReplyLineLength;
 	
-	var newClient = new SMTPClient(this);
 	var connectPromise = new Promise(function (resolve, reject) {
 		var _onError = _.bind(function (error) {
 			reject(error);
@@ -42,7 +45,14 @@ SMTPClient.prototype.connect = function (host, port, options) {
 		replyParser.maxLineLength = maxReplyLineLength;
 		replyParser.parse(socket).then(_.bind(function (reply) {
 			var client = new SMTPClient(this);
-			socket.once('end', _.bind(client.onEnd, client));
+			client._onEndListener = _.bind(client.onEnd, client);
+			socket.on('end', client._onEndListener);
+			client._onCloseListener = _.bind(client.onClose, client);
+			socket.on('close', client._onCloseListener);
+			client._onTimeoutListener = _.bind(client.onTimeout, client);
+			socket.on('timeout', client._onTimeoutListener);
+			client._onErrorListener = _.bind(client.onError, client);
+			socket.on('error', client._onErrorListener);
 			client.socket = socket;
 			client.server = {greeting: reply};
 			client.connect = function () {
@@ -92,7 +102,12 @@ SMTPClient.prototype.command = function (command, options) {
 		}).catch(function (error) {
 			reject(error);
 		});
-		this.socket.write(command, 'utf8');
+		var _write = _.bind(function(command){
+			if ( !this.socket.write(command, 'utf8') ) {
+				this.socket.once('drain', _write);
+			}
+		}, this, command);
+		process.nextTick(_write);
 	}, this));
 };
 
@@ -121,6 +136,33 @@ SMTPClient.prototype.close = function () {
 	}
 };
 
+SMTPClient.prototype.onError = function(error) {
+	this.emit('error');
+};
+
 SMTPClient.prototype.onEnd = function () {
+	this.emit('end');
+	this._cleanup();
+};
+
+SMTPClient.prototype.onClose = function (hadError) {
+	this.emit('close', hadError);
+	this._cleanup();
+};
+
+SMTPClient.prototype.onTimeout = function() {
+	this.emit('error', new Error('Timeout waiting on network data.'));
+	this._cleanup();
+};
+
+SMTPClient.prototype._cleanup = function() {
+	if ( this._onErrorListener) this.removeListener('end', this._onErrorListener);
+	if ( this._onEndListener) this.removeListener('end', this._onEndListener);
+	if ( this._onCloseListener) this.removeListener('close', this._onCloseListener);
+	if ( this._onTimeoutListener) this.removeListener('timeout', this._onTimeoutListener);
+	delete this._onErrorListener;
+	delete this._onEndListener;
+	delete this._onCloseListener;
+	delete this._onTimeoutListener;
 	delete this.socket;
 };

@@ -1,6 +1,8 @@
+var brake = require('brake');
 var expect = require("chai").expect;
 var net = require('net');
 var os = require('os');
+var stream = require('stream');
 var SMTPServer = require('smtp-server').SMTPServer;
 
 var SMTPClient = require('../src/client');
@@ -121,7 +123,7 @@ describe('SMTP Client', function () {
 		
 	});
 	
-	describe.only('Sending a command to the server', function () {
+	describe('Sending a command to the server', function () {
 		
 		var server;
 		var serverPort;
@@ -132,7 +134,6 @@ describe('SMTP Client', function () {
 				server = null;
 			}
 		});
-		
 		
 		it('resolves with the reply if command has been sent successfully.', function (done) {
 			serverPort = Math.floor(Math.random() * 10000) + 20000;
@@ -242,6 +243,7 @@ describe('SMTP Client', function () {
 					}
 				});
 		});
+		
 	});
 	
 });
