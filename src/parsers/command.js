@@ -13,6 +13,8 @@
 //  limitations under the License.
 //
 
+'use strict';
+
 var _ = require('underscore');
 var Promise = require('bluebird');
 
@@ -23,11 +25,8 @@ module.exports = SMTPCmdLineParser;
 SMTPCmdLineParser.prototype.constructor = SMTPCmdLineParser;
 
 function SMTPCmdLineParser() {
-	
 	this.maxLineLength = 512;
-	
 	this.timeout = 300000;
-	
 }
 
 SMTPCmdLineParser.prototype.parse = function (inputStream) {

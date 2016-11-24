@@ -153,7 +153,7 @@ describe('SMTP Reply Parser', function () {
 				if (count == 2) {
 					done();
 				}
-				return _orig(input);
+				return _orig.call(parser, input);
 			};
 			var reply = parser.parseReply(input);
 		});
