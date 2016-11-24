@@ -151,50 +151,6 @@ SMTPClient.prototype._write = function (data, options) {
 	}, this));
 };
 
-SMTPClient.prototype.sendLine = function (data, options) {
-	options = options || {};
-	var timeout = options.timeout || this.timeout;
-	var maxLineLength = options.maxLineLength || this.maxCommandLineLength;
-	if (_.isString(data)) {
-		data = Buffer.from(data, options.encoding || 'utf8');
-		delete options.encoding;
-	} else if (!data instanceof Buffer) {
-		return Promise.reject(new Error('Invalid input data - must be a string or buffer not ' + typeof data));
-	}
-	var start = 0;
-	var currChar;
-	while (start < data.length) {
-		currChar = data.readUInt8(start);
-		if ((currChar >= 9 && currChar <= 13) || currChar == 32) start++;
-		else break;
-	}
-	var end = data.length - 1;
-	while (end >= start) {
-		currChar = data.readUInt8(end);
-		if ((currChar >= 9 && currChar <= 13) || currChar == 32) start++;
-		else break;
-	}
-	if (start == end) {
-		return Promise.reject(new Error('Command line is whitespace only or empty.'));
-	}
-	var pos = start;
-	while (pos <= end) {
-		currChar = data.readUInt8(pos++);
-		if (currChar == 10 || currChar == 13) {
-			return Promise.reject(new Error("Command lines cannot contain line breaks."));
-		}
-	}
-	var outBufferSize = end - start + 2;
-	if (outBufferSize > outBufferSize) {
-		return Promise.reject(new Error(strfmt("Command line exceeds size limit of %d octets.", maxLineLength)));
-	}
-	var outBuffer = Buffer.alloc(outBufferSize);
-	data.copy(outBuffer, 0, start, end + 1);
-	outBuffer.writeUInt8(outBufferSize - 2, 13);
-	outBuffer.writeUInt8(outBufferSize - 1, 10);
-	return this._write(outBuffer, options);
-};
-
 SMTPClient.prototype.data = function (input) {
 	if (!this.socket) {
 		return Promise.reject(new Error('Client is not connected.'));
