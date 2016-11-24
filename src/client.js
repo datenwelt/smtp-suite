@@ -22,6 +22,7 @@ var strfmt = require('util').format;
 
 var SMTPReplyParser = require('./parsers/reply');
 var SMTPCommandParser = require('./parsers/command');
+var SMTPDataEncoder = require('./parsers/data').DotEncoder;
 
 module.exports = SMTPClient;
 
@@ -168,13 +169,53 @@ SMTPClient.prototype._write = function (data, options) {
 	}, this));
 };
 
-SMTPClient.prototype.data = function (input) {
+SMTPClient.prototype.data = function (input, options) {
+	options = options || {};
 	if (!this.socket) {
 		return Promise.reject(new Error('Client is not connected.'));
 	}
-	return new Promise(function (resolve, reject) {
+	if ( _.isString(input) ) {
+		input = Buffer.from(input, options.encoding || 'utf8');
 		
-	});
+	}
+	var inputStream;
+	if ( input instanceof Buffer ) {
+		inputStream = new stream.Readable({
+			read: _.bind(function(size) {
+				if ( this.bufferPos >= this.byteLength ) {
+					this.push(null);
+				} else {
+					var end = this.bufferPos + size > this.buffer.length ? this.bufferPos + size : this.buffer.length;
+					this.push(this.buffer.slice(bufferPos, end));
+					this.bufferPos += size;
+				}
+			}, inputStream)
+		});
+		inputStream.bufferPos = 0;
+		inputStream.buffer = input;
+	} else if (	data instanceof streams.Readable) {
+		inputStream = data;
+	} else {
+		return Promise.reject(new Error('Invalid input, need buffer, string or readable stream not ' + typeof input + "."));
+	}
+	return new Promise(_.bind(function (resolve, reject) {
+		var encoder = new SMTPDataEncoder();
+		encoder.on('end', function() {
+			resolve();
+		});
+		encoder.on('data', function(chunk) {
+			encoder.pause();
+			this._write(chunk, { timeout: 180000 }).then(function() {
+				encoder.unpause();
+			}).catch(function(error) {
+				reject(error instanceof Error ? error : new Error(error));
+			});
+		});
+		encoder.on('error', function(error) {
+			reject(error instanceof Error ? error : new Error(error));
+		});
+		encoder = inputStream.pipe(encoder);
+	}, this));
 };
 
 SMTPClient.prototype.upgrade = function (tls) {
