@@ -44,7 +44,7 @@ describe("SMTP Command Line Parser", function () {
 		
 		it("throws an error if the command line contains line breaks.", function () {
 			var parser = new SMTPCommandLineParser();
-			expect(function() {
+			expect(function () {
 				parser.parseCommandLine("QUIT\r\nQUIT\r\n")
 			}).to.throw('Command lines cannot contain line breaks.');
 		});
@@ -166,7 +166,7 @@ describe("SMTP Command Line Parser", function () {
 	describe('Serializing', function () {
 		
 		var parser;
-		beforeEach(function() {
+		beforeEach(function () {
 			parser = new SMTPCommandLineParser();
 		});
 		
@@ -398,7 +398,7 @@ describe("SMTP Command Line Parser", function () {
 				inputStream.push("XXXX ");
 			}
 		});
-
+		
 		it("emits an timeout error if the command line is not received within timeout.", function (done) {
 			var parser = new SMTPCommandLineParser();
 			parser.timeout = 500;
@@ -413,15 +413,15 @@ describe("SMTP Command Line Parser", function () {
 					expect(error.message).to.be.equal(strfmt('Timeout after waiting on SMTP command for more than %d seconds.', parser.timeout / 1000));
 					done();
 				});
-			setTimeout(	function () {
-					inputStream.push("QUIT\r\n");
+			setTimeout(function () {
+				inputStream.push("QUIT\r\n");
 			}, parser.timeout + 1000);
 		});
 		
 		
 		it("calls parseCommandLine() method with the next line from the stream", function (done) {
 			var parser = new SMTPCommandLineParser();
-			parser.parseCommandLine = function(line) {
+			parser.parseCommandLine = function (line) {
 				expect(line).to.be.equal("QUIT");
 				done();
 			};
@@ -438,6 +438,47 @@ describe("SMTP Command Line Parser", function () {
 			inputStream.push("QUIT\r\n");
 			inputStream.push(null);
 		});
-
+	});
+	
+	describe("Command line assertion", function () {
+		
+		var parser;
+		beforeEach(function () {
+			parser = new SMTPCommandLineParser();
+		});
+		
+		it("asserts valid command lines", function () {
+			var inputs = ["QUIT\r\n", "NOOP\r\n", "MAIL FROM:<test@baleen-mx.io>\r\n"];
+			_.each(inputs, function (input) {
+				expect(parser.assertCommandLine(input)).to.equal(input);
+			});
+		});
+		
+		it("append CRLF if missing", function () {
+			expect(parser.assertCommandLine("QUIT")).to.equal("QUIT\r\n");
+		});
+		
+		it("trims the input at both sides", function () {
+			expect(parser.assertCommandLine("   QUIT\t   \r\n")).to.equal("QUIT\r\n");
+		});
+		
+		it("throws an error if input contains a CR", function () {
+			expect(function () {
+				parser.assertCommandLine("   QUIT\rNOOP\t   \r\n")
+			}).to.throw('Command lines cannot contain line breaks.');
+		});
+		
+		it("throws an error if input is neither string nor buffer", function () {
+			expect(function () {
+				parser.assertCommandLine({ test: ""})
+			}).to.throw('Input must be string or buffer not object');
+		});
+		
+		it("throws an error if input exceeds max line length.", function () {
+			expect(function () {
+				parser.assertCommandLine('TESTESTSESTSESTSESTSEST', { maxLineLength: 10 })
+			}).to.throw('Command line exceeds maximum line length of 10 octets.');
+		});
+		
 	});
 });

@@ -195,7 +195,7 @@ SMTPCmdLineParser.prototype.parseCommandLine = function (line) {
 	
 };
 
-SMTPCmdLineParser.prototype.assert = function (input, options) {
+SMTPCmdLineParser.prototype.assertCommandLine = function (input, options) {
 	options = options || {};
 	var encoding = options.encoding || 'uft8';
 	var maxLineLength = options.maxLineLength || this.maxLineLength;
@@ -210,7 +210,7 @@ SMTPCmdLineParser.prototype.assert = function (input, options) {
 		}
 		command += "\r\n";
 		if (Buffer.byteLength(command, encoding) > maxLineLength) {
-			throw new Error('Command line exceeds maximum line length of %d octets.', maxLineLength);
+			throw new Error(strfmt('Command line exceeds maximum line length of %d octets.', maxLineLength));
 		}
 		return command;
 	}
