@@ -22,6 +22,8 @@ var strfmt = require('util').format;
 
 module.exports = SMTPReplyParser;
 
+Promise.config({cancellation: true});
+
 SMTPReplyParser.prototype.constructor = SMTPReplyParser;
 
 function SMTPReplyParser() {

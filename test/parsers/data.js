@@ -204,6 +204,60 @@ describe('SMTP DATA transform streams', function () {
 				inputStream.push(null);
 			});
 			
+			it('emits data chunks as complete lines.', function (done) {
+				var inputStream = new stream.Readable({
+					read: function () {
+					}
+				});
+				var encoder = inputStream.pipe(new data.DotEncoder());
+				var lineCount = 0;
+				encoder.on('data', function (chunk) {
+					chunk = chunk.toString('ascii');
+					try {
+						expect(chunk.length).to.be.above(2);
+						expect(chunk.endsWith("\r\n")).to.be.true;
+						if (lineCount < 3) {
+							expect(chunk).to.equal("testline" + lineCount + "\r\n");
+						}
+						lineCount++;
+					} catch (err) {
+						done(err);
+					}
+				});
+				encoder.on('end', function () {
+					expect(lineCount).to.equal(4);
+					done();
+				});
+				encoder.on('error', function (error) {
+					done(error);
+				});
+				inputStream.push("testline0\r\ntestline1\r\ntestline2\r\n");
+				inputStream.push(null);
+			});
+			
+		});
+		
+		it('emits an error if a line is too long', function (done) {
+			var line = "THE FOLLOWING LINE IS TOO LONG:\r\n"
+				+ Buffer.alloc(1001, 0x2f).toString('ascii')
+				+ "\r\n";
+			var inputStream = new stream.Readable({
+				read: function () {
+				}
+			});
+			var encoder = inputStream.pipe(new data.DotEncoder());
+			var lineCount = 0;
+			encoder.on('end', function () {
+				done(new Error('Test succeeded expectedly.'));
+			});
+			encoder.on('error', function (error) {
+				expect(error).to.be.an.instanceOf(Error);
+				expect(error.message).to.equal('Input line exceeds maximum line length of 1000 octets.');
+				done();
+			});
+			inputStream.push(line);
+			inputStream.push(null);
+			
 		});
 		
 	});
@@ -284,7 +338,7 @@ describe('SMTP DATA transform streams', function () {
 		it('ends the decoder stream after a line with a single dot', function (done) {
 			var input = "This is a test line.\r\n.\r\n";
 			var decoder = inputStream.pipe(new data.DotDecoder());
-			var text= "";
+			var text = "";
 			decoder.on('data', function (chunk) {
 				try {
 					chunk = chunk.toString('utf8');
@@ -321,9 +375,9 @@ describe('SMTP DATA transform streams', function () {
 			decoder.on('end', function () {
 				expect(text).to.equal("This is a test line.\r\n");
 			});
-			inputStream.on('data', function(chunk) {
+			inputStream.on('data', function (chunk) {
 				chunk = chunk.toString('utf8');
-				if ( chunk == "This is a test line.\r\n.\r\n") return;
+				if (chunk == "This is a test line.\r\n.\r\n") return;
 				try {
 					expect(text).to.equal("This is a test line.\r\n");
 					expect(chunk).to.equal("CONTINUED.\r\n");

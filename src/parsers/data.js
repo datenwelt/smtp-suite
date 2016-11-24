@@ -31,8 +31,10 @@ DotEncoder.prototype = Object.create(stream.Transform.prototype);
 DotEncoder.prototype.constructor = DotEncoder;
 
 function DotEncoder(options) {
-	stream.Transform.call(this, options);
-	this.buffer = Buffer.alloc(1024, 0x00);
+	options = options || {};
+	this.maxLineLength = options.maxLineLength || 1000;
+	stream.Transform.call(this);
+	this.buffer = Buffer.alloc(this.maxLineLength, 0x00);
 	this.bufferSize = 0;
 	this.lastChar = 0x00;
 }
@@ -46,9 +48,11 @@ DotEncoder.prototype._transform = function (chunk, encoding, callback) {
 	var write2Buffer = _.bind(function (c) {
 		this.buffer.writeUInt8(c, this.bufferSize++);
 		this.lastChar = c;
-		if (this.bufferSize == this.buffer.length) {
-			this.push(this.buffer);
+		if ( c == LF ) {
+			this.push(this.buffer.slice(0, this.bufferSize));
 			this.bufferSize = 0;
+		} else if (this.bufferSize == this.buffer.length) {
+			callback(new Error(strfmt('Input line exceeds maximum line length of %d octets.', this.buffer.length)));
 		}
 	}, this);
 	while (chunkPos < chunk.length) {

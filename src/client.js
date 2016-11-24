@@ -126,6 +126,9 @@ SMTPClient.prototype.command = function (command, options) {
 SMTPClient.prototype._write = function (data, options) {
 	options = options || {};
 	var timeout = options.timeout;
+	if (!this.socket) {
+		return Promise.reject(new Error('Client is not connected.'));
+	}
 	if (!data instanceof Buffer) {
 		return Promise.reject(new Error('Invalid input data - must be a buffer not ' + typeof data));
 	}
