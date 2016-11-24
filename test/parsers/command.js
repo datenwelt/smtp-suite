@@ -49,13 +49,6 @@ describe("SMTP Command Line Parser", function () {
 			}).to.throw('Command lines cannot contain line breaks.');
 		});
 		
-		it("throws an error if the command line starts with whitespace.", function () {
-			var parser = new SMTPCommandLineParser();
-			expect(function() {
-				parser.parseCommandLine("    QUIT\r\n")
-			}).to.throw('Command lines cannot start with whitespace.');
-		});
-		
 		it('skips trailing whitespace', function () {
 			var parser = new SMTPCommandLineParser();
 			var cmd = parser.parseCommandLine('HELO     ');

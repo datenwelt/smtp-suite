@@ -96,7 +96,7 @@ SMTPCmdLineParser.prototype.parse = function (inputStream) {
 		inputStream.once('error', onError);
 		inputStream.once('end', onEnd);
 		
-		if ( this.timeout && this.timeout > 0 ) {
+		if (this.timeout && this.timeout > 0) {
 			_timer = setTimeout(onTimeout, this.timeout);
 		}
 		
@@ -110,24 +110,22 @@ SMTPCmdLineParser.prototype.parseCommandLine = function (line) {
 	}
 	if (line instanceof Buffer) {
 		line = line.toString('utf8');
+	} else if (!_.isString(line)) {
+		throw new Error('Input must be string or buffer, but not ' + typeof line);
 	}
-	line = line.trimRight();
+	line = line.trim();
 	if (line.length > this.maxLineLength - 2) {
 		throw new Error(strfmt('Command line exceeds size limit of %d octets.', this.maxLineLength));
 	}
-	if ( line.match(/^\s/) ) {
-		throw new Error('Command lines cannot start with whitespace.');
-	}
-	if ( line.match(/[\r\n]/) ) {
+	if (line.match(/[\r\n]/)) {
 		throw new Error('Command lines cannot contain line breaks.');
 	}
 	var parts = line.split(/\s+/);
-	verb = parts[0];
 	var command = {
-		verb: verb
+		verb: _.first(parts)
 	};
 	parts = _.rest(parts);
-	switch (verb) {
+	switch (command.verb) {
 		case 'EHLO':
 			if (!parts.length) {
 				throw new Error('EHLO command without domain or address literal.');
@@ -197,6 +195,28 @@ SMTPCmdLineParser.prototype.parseCommandLine = function (line) {
 	
 };
 
+SMTPCmdLineParser.prototype.assert = function (input, options) {
+	options = options || {};
+	var encoding = options.encoding || 'uft8';
+	var maxLineLength = options.maxLineLength || this.maxLineLength;
+	var command = input;
+	if (command instanceof Buffer) {
+		command = Buffer.toString(command, encoding);
+	}
+	if (_.isString(command)) {
+		command = command.trim();
+		if (command.match(/[\r\n]/)) {
+			throw new Error("Command lines cannot contain line breaks.");
+		}
+		command += "\r\n";
+		if (Buffer.byteLength(command, encoding) > maxLineLength) {
+			throw new Error('Command line exceeds maximum line length of %d octets.', maxLineLength);
+		}
+		return command;
+	}
+	throw new Error('Input must be string or buffer not ' + typeof input);
+};
+
 SMTPCmdLineParser.prototype.serializeCommand = function (command) {
 	if (!command) {
 		return "NOOP\r\n";
@@ -242,7 +262,7 @@ SMTPCmdLineParser.prototype.serializeCommand = function (command) {
 		});
 	}
 	commandLine = commandLine.trim() + "\r\n";
-	if ( commandLine.length > this.maxLineLength )
+	if (commandLine.length > this.maxLineLength)
 		throw new Error(strfmt('Serialized SMTP command exceeds maximum line length of %d octets.', this.maxLineLength));
 	return commandLine;
 };
