@@ -49,6 +49,38 @@ describe('SMTP Client', function () {
 			var client = new SMTPClient();
 			client.connect('localhost', serverPort).then(function (reply) {
 				try {
+					expect(client.secure).to.be.false;
+					expect(client.socket).to.be.an.instanceOf(net.Socket);
+					expect(client.socket.remotePort).to.equal(serverPort);
+					var message = os.hostname() + " ESMTP";
+					expect(reply).to.eql({code: 220, message: message, lines: [message]});
+					done();
+				} catch (error) {
+					done(error);
+				}
+			}).catch(function (error) {
+				done(error);
+			});
+		});
+		
+		it('connects via TLS to an SMTP server and returns a promise which resolves with the server greeting.', function (done) {
+			serverPort = Math.floor(Math.random() * 10000) + 20000;
+			server = new SMTPServer({
+				secure: true,
+				rejectUnauthorized: false,
+				onConnect: function (session, callback) {
+					callback();
+				}
+			});
+			server.listen(serverPort);
+			var client = new SMTPClient();
+			client.connect('localhost', serverPort, {
+				tls: {
+					rejectUnauthorized: false
+				}
+			}).then(function (reply) {
+				try {
+					expect(client.secure).to.be.true;
 					expect(client.socket).to.be.an.instanceOf(net.Socket);
 					expect(client.socket.remotePort).to.equal(serverPort);
 					var message = os.hostname() + " ESMTP";
@@ -317,7 +349,7 @@ describe('SMTP Client', function () {
 			server.listen(serverPort);
 			var client = new SMTPClient();
 			var orig = client._cleanup;
-
+			
 			client.connect('localhost', serverPort)
 				.then(function () {
 					client._cleanup = function () {
@@ -327,7 +359,7 @@ describe('SMTP Client', function () {
 					};
 					client.close();
 				})
-				.catch(function(error) {
+				.catch(function (error) {
 					done(error);
 				});
 			

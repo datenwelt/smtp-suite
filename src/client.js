@@ -20,6 +20,7 @@ var net = require('net');
 var process = require('process');
 var stream = require('stream');
 var strfmt = require('util').format;
+var tls = require('tls');
 
 
 var SMTPReplyParser = require('./parsers/reply');
@@ -37,7 +38,7 @@ function SMTPClient(options) {
 		timeout: 300000,
 		maxReplyLineLength: 512,
 		maxCommandLineLength: 512,
-		maxDataLineLength: 1000
+		maxDataLineLength: 1000,
 	}, options || {});
 	this.timeout = options.timeout;
 	this.maxReplyLineLength = options.maxReplyLineLength;
@@ -45,10 +46,13 @@ function SMTPClient(options) {
 	this.maxDataLineLength = options.maxDataLineLength;
 	this.sending = false;
 	this.needsDrain = false;
+	this.secure = false;
 }
 
 SMTPClient.prototype.connect = function (host, port, options) {
 	options = options || {};
+	var socket;
+	var tlsOpts = options.tls || false;
 	var timeout = options.timeout || this.timeout;
 	var maxReplyLineLength = options.maxReplyLineLength || this.maxReplyLineLength;
 	
@@ -56,27 +60,33 @@ SMTPClient.prototype.connect = function (host, port, options) {
 		var _onError = _.bind(function (error) {
 			reject(error);
 		}, this);
-		var socket = net.createConnection(port, host, _.bind(function () {
+		var _onConnect = _.bind(function () {
+			this.secure = !!tlsOpts;
 			socket.removeListener('error', _onError);
-		}, this));
+			this._onEndListener = _.bind(this.onEnd, this);
+			socket.on('end', this._onEndListener);
+			this._onCloseListener = _.bind(this.onClose, this);
+			socket.on('close', this._onCloseListener);
+			this._onTimeoutListener = _.bind(this.onTimeout, this);
+			socket.on('timeout', this._onTimeoutListener);
+			this._onErrorListener = _.bind(this.onError, this);
+			socket.on('error', this._onErrorListener);
+			this.socket = socket;
+			this.connect = function () {
+				return connectPromise;
+			};
+		}, this);
+		if ( !tlsOpts ) {
+			socket = net.createConnection(port, host, _onConnect);
+		} else {
+			socket = tls.connect(port, host, tlsOpts, _onConnect);
+		}
 		socket.once('error', _onError);
 		var replyParser = new SMTPReplyParser();
 		replyParser.timeout = timeout;
 		replyParser.maxLineLength = maxReplyLineLength;
 		replyParser.parse(socket)
 			.then(_.bind(function (reply) {
-				this._onEndListener = _.bind(this.onEnd, this);
-				socket.on('end', this._onEndListener);
-				this._onCloseListener = _.bind(this.onClose, this);
-				socket.on('close', this._onCloseListener);
-				this._onTimeoutListener = _.bind(this.onTimeout, this);
-				socket.on('timeout', this._onTimeoutListener);
-				this._onErrorListener = _.bind(this.onError, this);
-				socket.on('error', this._onErrorListener);
-				this.socket = socket;
-				this.connect = function () {
-					return connectPromise;
-				};
 				resolve(reply);
 			}, this))
 			.catch(function (error) {
