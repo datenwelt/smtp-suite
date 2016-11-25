@@ -17,6 +17,8 @@
 var _ = require('underscore');
 var events = require('events');
 var net = require('net');
+var process = require('process');
+var stream = require('stream');
 var strfmt = require('util').format;
 
 
@@ -50,7 +52,7 @@ SMTPClient.prototype.connect = function (host, port, options) {
 	var timeout = options.timeout || this.timeout;
 	var maxReplyLineLength = options.maxReplyLineLength || this.maxReplyLineLength;
 	
-	var connectPromise = new Promise(function (resolve, reject) {
+	var connectPromise = new Promise(_.bind(function (resolve, reject) {
 		var _onError = _.bind(function (error) {
 			reject(error);
 		}, this);
@@ -61,30 +63,26 @@ SMTPClient.prototype.connect = function (host, port, options) {
 		var replyParser = new SMTPReplyParser();
 		replyParser.timeout = timeout;
 		replyParser.maxLineLength = maxReplyLineLength;
-		replyParser.parse(socket).then(_.bind(function (reply) {
-			var client = new SMTPClient(this);
-			client._onEndListener = _.bind(client.onEnd, client);
-			socket.on('end', client._onEndListener);
-			client._onCloseListener = _.bind(client.onClose, client);
-			socket.on('close', client._onCloseListener);
-			client._onTimeoutListener = _.bind(client.onTimeout, client);
-			socket.on('timeout', client._onTimeoutListener);
-			client._onErrorListener = _.bind(client.onError, client);
-			socket.on('error', client._onErrorListener);
-			client.socket = socket;
-			client.server = {greeting: reply};
-			client.connect = function () {
-				return connectPromise;
-			};
-			resolve(client);
-		}, this)).catch(function (error) {
-			try {
-				socket.close();
-			} catch (err) {
-			}
-			reject(error);
-		});
-	}, this);
+		replyParser.parse(socket)
+			.then(_.bind(function (reply) {
+				this._onEndListener = _.bind(this.onEnd, this);
+				socket.on('end', this._onEndListener);
+				this._onCloseListener = _.bind(this.onClose, this);
+				socket.on('close', this._onCloseListener);
+				this._onTimeoutListener = _.bind(this.onTimeout, this);
+				socket.on('timeout', this._onTimeoutListener);
+				this._onErrorListener = _.bind(this.onError, this);
+				socket.on('error', this._onErrorListener);
+				this.socket = socket;
+				this.connect = function () {
+					return connectPromise;
+				};
+				resolve(reply);
+			}, this))
+			.catch(function (error) {
+				reject(error);
+			});
+	}, this), this);
 	return connectPromise;
 	
 };
@@ -148,7 +146,7 @@ SMTPClient.prototype._write = function (data, options) {
 			this.needsDrain = !this.socket.write(data, 'utf8', _.bind(function (err) {
 				this.sending = false;
 				if (_timer) {
-					process.clearTimeout(_timer);
+					clearTimeout(_timer);
 				}
 				if (err) {
 					reject(err instanceof Error ? err : new Error(err));
@@ -163,7 +161,7 @@ SMTPClient.prototype._write = function (data, options) {
 			}
 		}, this, data);
 		if (timeout) {
-			_timer = process.setTimeout(_onTimeout);
+			_timer = setTimeout(_onTimeout, timeout);
 		}
 		process.nextTick(_doWrite);
 	}, this));
@@ -174,44 +172,52 @@ SMTPClient.prototype.data = function (input, options) {
 	if (!this.socket) {
 		return Promise.reject(new Error('Client is not connected.'));
 	}
-	if ( _.isString(input) ) {
+	if (_.isString(input)) {
 		input = Buffer.from(input, options.encoding || 'utf8');
 		
 	}
 	var inputStream;
-	if ( input instanceof Buffer ) {
-		inputStream = new stream.Readable({
-			read: _.bind(function(size) {
-				if ( this.bufferPos >= this.byteLength ) {
+	if (input instanceof Buffer) {
+		(function () {
+			inputStream = new stream.Readable();
+			inputStream._read = _.bind(function (size) {
+				if (this.bufferPos >= this.buffer.length) {
 					this.push(null);
 				} else {
-					var end = this.bufferPos + size > this.buffer.length ? this.bufferPos + size : this.buffer.length;
-					this.push(this.buffer.slice(bufferPos, end));
+					var end = this.bufferPos + size > this.buffer.length ? this.buffer.length : this.bufferPos + size;
+					this.push(this.buffer.slice(this.bufferPos, end));
 					this.bufferPos += size;
 				}
-			}, inputStream)
-		});
+			}, inputStream);
+		})();
 		inputStream.bufferPos = 0;
 		inputStream.buffer = input;
-	} else if (	data instanceof streams.Readable) {
+	} else if (data instanceof streams.Readable) {
 		inputStream = data;
 	} else {
 		return Promise.reject(new Error('Invalid input, need buffer, string or readable stream not ' + typeof input + "."));
 	}
 	return new Promise(_.bind(function (resolve, reject) {
 		var encoder = new SMTPDataEncoder();
-		encoder.on('end', function() {
-			resolve();
-		});
-		encoder.on('data', function(chunk) {
+		encoder.on('end', _.bind(function () {
+			var replyParser = new SMTPReplyParser();
+			replyParser.parse(this.socket)
+				.then(function (reply) {
+					resolve(reply);
+				})
+				.catch(function (error) {
+					reject(error);
+				});
+		}, this));
+		encoder.on('data', _.bind(function (chunk) {
 			encoder.pause();
-			this._write(chunk, { timeout: 180000 }).then(function() {
-				encoder.unpause();
-			}).catch(function(error) {
+			var p = this._write(chunk, {timeout: 180000}).then(function () {
+				encoder.resume();
+			}).catch(function (error) {
 				reject(error instanceof Error ? error : new Error(error));
 			});
-		});
-		encoder.on('error', function(error) {
+		}, this));
+		encoder.on('error', function (error) {
 			reject(error instanceof Error ? error : new Error(error));
 		});
 		encoder = inputStream.pipe(encoder);

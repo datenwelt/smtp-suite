@@ -74,7 +74,7 @@ SMTPReplyParser.prototype.parse = function (inputStream) {
 					replyLines.push(replyLine);
 					if (replyLine.isLast) {
 						if (pos != chunk.length) {
-							throw new Error('Illicit overhead data after end of reply has been indicated.');
+							return cleanup(new Error('Illicit overhead data after end of reply has been indicated.'));
 						}
 						try {
 							reply = this.parseReply(replyLines);

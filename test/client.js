@@ -38,7 +38,7 @@ describe('SMTP Client', function () {
 			server = null;
 		});
 		
-		it('connects to an SMTP server and returns a promise which resolves with a new client instance.', function (done) {
+		it('connects to an SMTP server and returns a promise which resolves with the server greeting.', function (done) {
 			serverPort = Math.floor(Math.random() * 10000) + 20000;
 			server = new SMTPServer({
 				onConnect: function (session, callback) {
@@ -47,13 +47,12 @@ describe('SMTP Client', function () {
 			});
 			server.listen(serverPort);
 			var client = new SMTPClient();
-			client.connect('localhost', serverPort).then(function (client) {
+			client.connect('localhost', serverPort).then(function (reply) {
 				try {
-					expect(client).to.be.an.instanceOf(SMTPClient);
 					expect(client.socket).to.be.an.instanceOf(net.Socket);
 					expect(client.socket.remotePort).to.equal(serverPort);
 					var message = os.hostname() + " ESMTP";
-					expect(client.server.greeting).to.eql({code: 220, message: message, lines: [message]});
+					expect(reply).to.eql({code: 220, message: message, lines: [message]});
 					done();
 				} catch (error) {
 					done(error);
@@ -141,7 +140,7 @@ describe('SMTP Client', function () {
 			server.listen(serverPort);
 			var client = new SMTPClient();
 			client.connect('localhost', serverPort)
-				.then(function (client) {
+				.then(function () {
 					return client.command('EHLO ' + os.hostname());
 				})
 				.then(function (reply) {
@@ -165,7 +164,7 @@ describe('SMTP Client', function () {
 			server.listen(serverPort);
 			var client = new SMTPClient();
 			client.connect('localhost', serverPort)
-				.then(function (client) {
+				.then(function () {
 					client.close();
 					return client.command('EHLO ' + os.hostname());
 				})
@@ -194,8 +193,7 @@ describe('SMTP Client', function () {
 			server.listen(serverPort);
 			var client = new SMTPClient();
 			client.connect('localhost', serverPort)
-				.then(function (c) {
-					client = c;
+				.then(function () {
 					return client.command('EHLO ' + os.hostname());
 				})
 				.then(function () {
@@ -223,8 +221,7 @@ describe('SMTP Client', function () {
 			server.listen(serverPort);
 			var client = new SMTPClient();
 			client.connect('localhost', serverPort)
-				.then(function (c) {
-					client = c;
+				.then(function () {
 					return client.command('EHLO ' + os.hostname());
 				})
 				.then(function () {
@@ -242,6 +239,98 @@ describe('SMTP Client', function () {
 						done(error);
 					}
 				});
+		});
+		
+	});
+	
+	describe("Sending DATA to the server", function () {
+		
+		var serverPort;
+		var server;
+		var client;
+		
+		beforeEach(function (done) {
+			serverPort = Math.floor(Math.random() * 10000) + 20000;
+			server = new SMTPServer({
+				authOptional: true
+			});
+			server.listen(serverPort);
+			client = new SMTPClient();
+			client.connect('localhost', serverPort)
+				.then(function () {
+					return client.command('EHLO ' + os.hostname());
+				})
+				.then(function () {
+					return client.command('MAIL FROM:<>');
+				})
+				.then(function () {
+					return client.command('RCPT TO:<test@baleen-mx.io>');
+				})
+				.then(function () {
+					return client.command('DATA');
+				})
+				.then(function () {
+					done();
+				})
+				.catch(function (error) {
+					done(error);
+				});
+			
+		});
+		
+		afterEach(function () {
+			if (server) {
+				server.close();
+				server = null;
+			}
+		});
+		
+		
+		it("resolves a promise with the reply if data has been sent successfully.", function (done) {
+			var data = "Subject: TEST\r\n"
+				+ "\r\n"
+				+ "Testmail";
+			client.data(data)
+				.then(function (reply) {
+					try {
+						expect(reply).to.be.exist;
+						expect(reply.code).to.equal(250);
+						done();
+					} catch (error) {
+						done(error);
+					}
+				})
+				.catch(function (error) {
+					done(error);
+				});
+			
+		});
+	});
+	
+	describe('Cleanup', function () {
+		
+		it("cleans up after connection has been closed by client.", function (done) {
+			var serverPort = Math.floor(Math.random() * 10000) + 20000;
+			var server = new SMTPServer({
+				authOptional: true,
+			});
+			server.listen(serverPort);
+			var client = new SMTPClient();
+			var orig = client._cleanup;
+
+			client.connect('localhost', serverPort)
+				.then(function () {
+					client._cleanup = function () {
+						client._cleanup = orig;
+						client._cleanup();
+						done();
+					};
+					client.close();
+				})
+				.catch(function(error) {
+					done(error);
+				});
+			
 		});
 		
 	});
