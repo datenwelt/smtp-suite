@@ -167,16 +167,16 @@ SMTPReplyParser.prototype.parseReply = function (input) {
 		}
 		return memo;
 	}, this), {});
-	if (reply >= 200 && reply < 300) {
+	if (reply.code >= 200 && reply.code < 300) {
 		reply.success = true;
-		reply.intermeidate = false;
-	} else if (reply >= 300 && reply < 400) {
+		reply.intermediate = false;
+	} else if (reply.code >= 300 && reply.code < 400) {
 		reply.success = true;
-		reply.intermeidate = true;
-	} else if (reply >= 400 && reply < 500) {
+		reply.intermediate = true;
+	} else if (reply.code >= 400 && reply.code < 500) {
 		reply.success = false;
 		reply.transient = true;
-	} else if (reply >= 500 && reply < 600) {
+	} else if (reply.code >= 500 && reply.code < 600) {
 		reply.success = false;
 		reply.transient = false;
 	}

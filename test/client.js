@@ -53,7 +53,13 @@ describe('SMTP Client', function () {
 					expect(client.socket).to.be.an.instanceOf(net.Socket);
 					expect(client.socket.remotePort).to.equal(serverPort);
 					var message = os.hostname() + " ESMTP";
-					expect(reply).to.eql({code: 220, message: message, lines: [message]});
+					expect(reply).to.eql({
+						code: 220,
+						message: message,
+						lines: [message],
+						intermediate: false,
+						success: true
+					});
 					done();
 				} catch (error) {
 					done(error);
@@ -84,7 +90,13 @@ describe('SMTP Client', function () {
 					expect(client.socket).to.be.an.instanceOf(net.Socket);
 					expect(client.socket.remotePort).to.equal(serverPort);
 					var message = os.hostname() + " ESMTP";
-					expect(reply).to.eql({code: 220, message: message, lines: [message]});
+					expect(reply).to.eql({
+						code: 220,
+						message: message,
+						lines: [message],
+						intermediate: false,
+						success: true
+					});
 					done();
 				} catch (error) {
 					done(error);
@@ -339,12 +351,45 @@ describe('SMTP Client', function () {
 		});
 	});
 	
+	describe('Upgrading connection to TLS', function () {
+		
+		it('resolves a promise after upgrade was successful.', function (done) {
+			var serverPort = Math.floor(Math.random() * 10000) + 20000;
+			var server = new SMTPServer({
+				authOptional: true
+			});
+			server.listen(serverPort);
+			var client = new SMTPClient();
+			client.connect('localhost', serverPort)
+				.then(function () {
+					expect(client.secure).to.be.false;
+					return client.command('EHLO ' + os.hostname());
+				})
+				.then(function (reply) {
+					expect(reply.lines).to.contain('STARTTLS');
+					return client.command('STARTTLS');
+				})
+				.then(function (reply) {
+					expect(reply.success).to.be.true;
+					return client.upgrade({tls: {rejectUnauthorized: false}});
+				})
+				.then(function () {
+					expect(client.secure).to.be.true;
+					done();
+				})
+				.catch(function (error) {
+					done(error);
+				});
+		});
+		
+	});
+	
 	describe('Cleanup', function () {
 		
 		it("cleans up after connection has been closed by client.", function (done) {
 			var serverPort = Math.floor(Math.random() * 10000) + 20000;
 			var server = new SMTPServer({
-				authOptional: true,
+				authOptional: true
 			});
 			server.listen(serverPort);
 			var client = new SMTPClient();

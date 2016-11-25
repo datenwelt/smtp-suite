@@ -234,13 +234,42 @@ SMTPClient.prototype.data = function (input, options) {
 	}, this));
 };
 
-SMTPClient.prototype.upgrade = function (tls) {
+SMTPClient.prototype.upgrade = function (options) {
+	options = options || {};
+	var timeout = options.timeout || this.timeout;
+	var tlsOpts = options.tls || {};
 	if (!this.socket) {
 		return Promise.reject(new Error('Client is not connected.'));
 	}
-	return new Promise(function (resolve, reject) {
-		
-	});
+	tlsOpts.socket = this.socket;
+	return new Promise(_.bind(function (resolve, reject) {
+		var _timer;
+		var _onError = _.bind(function(error) {
+			if ( _timer ) clearTimeout(_timer);
+			reject(error);
+		});
+		var _onTimeout = _.bind(function() {
+			tlsSocket.removeListener('error', _onError);
+			reject(new Error());
+		}, this);
+		var tlsSocket = tls.connect(tlsOpts, _.bind(function() {
+			if ( _timer ) clearTimeout(_timer);
+			tlsSocket.removeListener('error', _onError);
+			_.each(['end', 'close', 'error'], function(event) {
+				_.each(this.socket.listeners(event), function(listener) {
+					tlsSocket.addListener(event, listener);
+					this.socket.removeListener(event, listener);
+				}, this);
+			}, this);
+			this.socket = tlsSocket;
+			this.secure = true;
+			resolve(tlsSocket);
+		}, this));
+		tlsSocket.once('error', _onError);
+		if ( timeout ) {
+			_timer = setTimeout(_onTimeout, timeout);
+		}
+	}, this));
 };
 
 SMTPClient.prototype.close = function () {

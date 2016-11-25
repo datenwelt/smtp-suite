@@ -105,33 +105,45 @@ describe('SMTP Reply Parser', function () {
 		it('returns an object when parsing valid replies from string.', function () {
 			var input = "250 OK";
 			var reply = parser.parseReply(input);
-			expect(reply).to.eql({code: 250, message: 'OK', lines: ['OK']});
+			expect(reply).to.eql({code: 250, message: 'OK', lines: ['OK'], intermediate: false, success: true});
 			
 		});
 		
 		it('returns an object when parsing valid replies from multiline string.', function () {
 			var input = "250-baleen-mx.io\r\n250 STARTTLS";
 			var reply = parser.parseReply(input);
-			expect(reply).to.eql({code: 250, message: 'baleen-mx.io', lines: ['baleen-mx.io', 'STARTTLS']});
+			expect(reply).to.eql({
+				code: 250,
+				message: 'baleen-mx.io',
+				lines: ['baleen-mx.io', 'STARTTLS'],
+				intermediate: false,
+				success: true
+			});
 		});
 		
 		it('returns an object when parsing valid replies from buffers.', function () {
 			var input = Buffer.from("250 OK");
 			var reply = parser.parseReply(input);
-			expect(reply).to.eql({code: 250, message: 'OK', lines: ['OK']});
+			expect(reply).to.eql({code: 250, message: 'OK', lines: ['OK'], intermediate: false, success: true});
 			
 		});
 		
 		it('returns an object when parsing valid replies from multiline buffers.', function () {
 			var input = Buffer.from("250-baleen-mx.io\r\n250 STARTTLS");
 			var reply = parser.parseReply(input);
-			expect(reply).to.eql({code: 250, message: 'baleen-mx.io', lines: ['baleen-mx.io', 'STARTTLS']});
+			expect(reply).to.eql({
+				code: 250,
+				message: 'baleen-mx.io',
+				lines: ['baleen-mx.io', 'STARTTLS'],
+				intermediate: false,
+				success: true
+			});
 		});
 		
 		it('returns an object when parsing valid replies from reply line arrays.', function () {
 			var input = [{code: 250, message: 'OK', isLast: true}];
 			var reply = parser.parseReply(input);
-			expect(reply).to.eql({code: 250, message: 'OK', lines: ['OK']});
+			expect(reply).to.eql({code: 250, message: 'OK', lines: ['OK'], intermediate: false, success: true});
 			
 		});
 		
@@ -141,7 +153,13 @@ describe('SMTP Reply Parser', function () {
 				{code: 250, message: 'STARTTLS', isLast: true}
 			];
 			var reply = parser.parseReply(input);
-			expect(reply).to.eql({code: 250, message: 'baleen-mx.io', lines: ['baleen-mx.io', 'STARTTLS']});
+			expect(reply).to.eql({
+				code: 250,
+				message: 'baleen-mx.io',
+				lines: ['baleen-mx.io', 'STARTTLS'],
+				intermediate: false,
+				success: true
+			});
 		});
 		
 		it('calls parseReplyLine() for every input line.', function (done) {
@@ -196,7 +214,7 @@ describe('SMTP Reply Parser', function () {
 		it('parses SMTP single line replies from input stream', function (done) {
 			parser.parse(inputStream)
 				.then(function (reply) {
-					expect(reply).to.eql({code: 250, message: 'OK', lines: ['OK']})
+					expect(reply).to.eql({code: 250, message: 'OK', lines: ['OK'], intermediate: false, success: true})
 					done();
 				})
 				.catch(function (error) {
@@ -209,7 +227,13 @@ describe('SMTP Reply Parser', function () {
 		it('parses SMTP multi line replies from input stream', function (done) {
 			parser.parse(inputStream)
 				.then(function (reply) {
-					expect(reply).to.eql({code: 250, message: 'BEGIN', lines: ['BEGIN', 'END']});
+					expect(reply).to.eql({
+						code: 250,
+						message: 'BEGIN',
+						lines: ['BEGIN', 'END'],
+						intermediate: false,
+						success: true
+					});
 					done();
 				})
 				.catch(function (error) {
@@ -222,7 +246,13 @@ describe('SMTP Reply Parser', function () {
 		it('parses SMTP multi line replies from input stream', function (done) {
 			parser.parse(inputStream)
 				.then(function (reply) {
-					expect(reply).to.eql({code: 250, message: 'BEGIN', lines: ['BEGIN', 'END']});
+					expect(reply).to.eql({
+						code: 250,
+						message: 'BEGIN',
+						lines: ['BEGIN', 'END'],
+						intermediate: false,
+						success: true
+					});
 					done();
 				})
 				.catch(function (error) {
@@ -343,9 +373,9 @@ describe('SMTP Reply Parser', function () {
 		});
 		
 		it('too big lines result in an error', function () {
-			parser.maxLineLength=3;
+			parser.maxLineLength = 3;
 			expect(function () {
-				parser.serializeReply({ code: 250, message: 'TOOLONG'});
+				parser.serializeReply({code: 250, message: 'TOOLONG'});
 			}).to.throw('Number of input bytes exceeds line limit of 3 octets.');
 		});
 		
@@ -379,19 +409,19 @@ describe('SMTP Reply Parser', function () {
 			expect(reply).to.eql(expected);
 		});
 		
-		it('can serialize valid single line replies', function() {
+		it('can serialize valid single line replies', function () {
 			var reply = parser.serializeReply({code: 250, message: 'BEGIN', lines: ['BEGIN']});
 			var expected = "250 BEGIN\r\n";
 			expect(reply).to.eql(expected);
 		});
 		
-		it('can serialize valid multi line replies', function() {
+		it('can serialize valid multi line replies', function () {
 			var reply = parser.serializeReply({code: 250, message: 'BEGIN', lines: ['BEGIN', 'END']});
 			var expected = "250-BEGIN\r\n250 END\r\n";
 			expect(reply).to.eql(expected);
 		});
 		
-		it('trims whitespace in reply lines', function() {
+		it('trims whitespace in reply lines', function () {
 			var reply = parser.serializeReply({code: 250, message: 'BEGIN', lines: ["BEGIN    \r\n", "END\r\n"]});
 			var expected = "250-BEGIN\r\n250 END\r\n";
 			expect(reply).to.eql(expected);
