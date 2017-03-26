@@ -1,8 +1,6 @@
-var brake = require('brake');
 var expect = require("chai").expect;
 var net = require('net');
 var os = require('os');
-var stream = require('stream');
 var SMTPServer = require('smtp-server').SMTPServer;
 
 var SMTPClient = require('../src/client');
@@ -115,7 +113,7 @@ describe('SMTP Client', function () {
 			});
 			server.listen(serverPort);
 			var client = new SMTPClient();
-			client.connect('localhost', serverPort + 1).then(function (client) {
+			client.connect('localhost', serverPort + 1).then(function () {
 				done(new Error('Test succeeded unexpectedly.'));
 			}).catch(function (error) {
 				done();
@@ -131,7 +129,7 @@ describe('SMTP Client', function () {
 			});
 			server.listen(serverPort);
 			var client = new SMTPClient({timeout: 500});
-			client.connect('localhost', serverPort).then(function (client) {
+			client.connect('localhost', serverPort).then(function () {
 				done(new Error('Test succeeded unexpectedly.'));
 			}).catch(function (error) {
 				expect(error.message).to.equal('Timeout parsing reply after 0.5 seconds.');
@@ -152,7 +150,7 @@ describe('SMTP Client', function () {
 			});
 			server.listen(serverPort);
 			var client = new SMTPClient({maxReplyLineLength: 4});
-			client.connect('localhost', serverPort).then(function (client) {
+			client.connect('localhost', serverPort).then(function () {
 				done(new Error('Test succeeded unexpectedly.'));
 			}).catch(function (error) {
 				try {
